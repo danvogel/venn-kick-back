@@ -31,7 +31,7 @@ sub download_profile
 
     if (-e $cache_name)
     {
-	print STDERR qq{$profile_id: already have it locally as $cache_name\n};
+	print STDERR qq{$profile_id: already have profile locally as $cache_name\n};
 	return;
     }
 
@@ -139,7 +139,7 @@ sub extract_backed_projects
     return [sort keys %rtn];
 }
 
-sub repr_meta
+sub repr_profile_meta
 {
     my ($id, $meta, undef) = @_;
     
@@ -163,10 +163,10 @@ sub repr_meta
     return $s;
 }
 
-sub repr_project
+sub repr_project_backed
 {
     my ($id, $proj, undef) = @_;
-    return join(q{}, '{', qq{ user="$id" vennback="project" project="$proj" }, '}');
+    return join(q{}, '{', qq{ user="$id" vennback="project_backed" project="$proj" }, '}');
 }
 
 sub read_profile
@@ -177,7 +177,7 @@ sub read_profile
     my $profile_content = read_profile_content($profile_id);
 
     my $meta = read_profile_meta($profile_content);
-    print repr_meta($profile_id, $meta), qq{\n};
+    print repr_profile_meta($profile_id, $meta), qq{\n};
 
     my $profile_paged = extract_additional_pages($profile_content);
     foreach my $profile_page (@{$profile_paged})
@@ -196,7 +196,7 @@ sub read_profile
 
     foreach my $proj (@projects)
     {
-	print repr_project($profile_id, $proj), qq{\n};
+	print repr_project_backed($profile_id, $proj), qq{\n};
     }
     return;
 }
