@@ -80,6 +80,9 @@ sub read_profile_content
 {
     my ($profile_id, undef) = @_;
     my $profile_h;
+
+    download_profile($profile_id);
+
     my $cache_name = profile_cache_name($profile_id);
     open($profile_h, q{<}, $cache_name) or
 	croak(qq{Unable to open profile '$profile_id' as '$cache_name'});
@@ -173,7 +176,6 @@ sub read_profile
 {
     my ($profile_id, undef) = @_;
 
-    download_profile($profile_id);
     my $profile_content = read_profile_content($profile_id);
 
     my $meta = read_profile_meta($profile_content);
@@ -187,7 +189,6 @@ sub read_profile
 
     foreach my $profile_page (@{$profile_paged})
     {
-	download_profile($profile_page);
 	my $profile_content_ext = read_profile_content($profile_page);
 	push(@{$profile_content}, @{$profile_content_ext});
     }
