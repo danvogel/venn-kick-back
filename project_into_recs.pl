@@ -7,6 +7,7 @@ use warnings;
 use Carp;
 
 use File::Basename qw(dirname basename);
+use Data::Dumper;
 
 my $TIME_BETWEEN_PAGE_REQUESTS = 3; # time, in s, between additional page loads
 
@@ -17,12 +18,12 @@ my $PROJECT_URL = q{https://www.kickstarter.com/projects/};
 
 sub project_cache_name
 {
-    my ($project_id, $project_post, undef) = @_;
+    my ($project_id, $cursor, $page_ct, undef) = @_;
 
     my $project_escaped = $project_id;
-    if ($project_post)
+    if ($page_ct)
     {
-	$project_escaped .= $project_post;
+	$project_escaped .= q{__} . $page_ct . q{__} . $cursor;
     }
     $project_escaped =~ s/backers//gixm;
     $project_escaped =~ s/\?/__/gixm;
@@ -34,19 +35,20 @@ sub project_cache_name
 
 sub download_project
 {
-    my ($project_id, $project_post, undef) = @_;
-    my $cache_name = project_cache_name($project_id, $project_post);
-
-    if (!$project_post)
-    {
-	$project_post = $BACKER_PAGE;
-    }
-
+    my ($project_id, $cursor, $page_ct, undef) = @_;
+    my $cache_name = project_cache_name($project_id, $cursor, $page_ct);
 
     if (-e $cache_name)
     {
-	print STDERR qq{$project_id: already have project locally as $cache_name\n};
+	print STDERR qq{$project_id: already have project },
+	qq{locally as $cache_name\n};
 	return;
+    }
+
+    my $project_post = $BACKER_PAGE;
+    if ($cursor)
+    {
+	$project_post .= qq{?cursor=$cursor};
     }
 
     my @cmd = (
@@ -57,7 +59,7 @@ sub download_project
 	);
 
     my $cmd_str = join(q{}, @cmd);
-    #print $cmd_str, qq{\n};
+    print $cmd_str, qq{\n};
     print STDERR qq{$project_id: Downloading project...\n};
     system($cmd_str);
     sleep($TIME_BETWEEN_PAGE_REQUESTS);
@@ -68,15 +70,30 @@ sub read_project_backers
 {
     my ($profile_content, undef) = @_;
 
+    my $cursor = q{unknown};
+    my $final_page = undef;
     my %backers = ();
 
     for (my $i = 0; $i < scalar @{$profile_content}; ++$i)
     {
 	my $line = $profile_content->[$i];
 
+	if (!defined $final_page && # defined once per pageload
+	    $line =~ /data-last_page=\"/)
+	{
+	    # is this the final set of records?
+	    $final_page = ($line =~ /data-last_page=\"true\"/);
+	}
+
 	if ($line !~ /NS\_backers\_\_backing\_row/)
 	{
 	    next;
+	}
+
+	if ($line =~ /data-cursor="(\d+)"/)
+	{
+	    # keep updating with last cursor seen
+	    $cursor = $1;
 	}
 
 	++$i;
@@ -87,7 +104,11 @@ sub read_project_backers
 	}
     }
     
-    return [ sort keys %backers ];
+    return { 
+	backers => [ sort keys %backers ], 
+	final_page => $final_page,
+	cursor => $cursor
+    };
 }
 
 sub read_project_meta
@@ -147,6 +168,8 @@ sub read_project_meta
     return \%rtn;
 }
 
+# This Fn doesn't work because Kickstarter doesn't respect page numbers;
+#   have to make each request by parsing the previous request result.
 sub extract_additional_pages
 {
     my ($profile_content, undef) = @_;
@@ -180,12 +203,12 @@ sub extract_additional_pages
 
 sub read_project_content
 {
-    my ($project_id, $project_post, undef) = @_;
+    my ($project_id, $cursor, $page_ct, undef) = @_;
     my $project_h;
 
-    download_project($project_id, $project_post);
+    download_project($project_id, $cursor, $page_ct);
 
-    my $cache_name = project_cache_name($project_id, $project_post);
+    my $cache_name = project_cache_name($project_id, $cursor, $page_ct);
     open($project_h, q{<}, $cache_name) or
 	croak(qq{Unable to open project '$project_id' as '$cache_name'});
     my @project = <$project_h>;
@@ -230,24 +253,26 @@ sub read_project
 {
     my ($project_map, undef) = @_;
 
-    my $project_content = read_project_content($project_map->{p_id}, q{});
+    my $project_content = read_project_content($project_map->{p_id});
 
     my $meta = read_project_meta($project_content);
     print repr_project_meta($project_map, $meta), qq{\n};
 
-    my $project_paged = extract_additional_pages($project_content);
-    #foreach my $project_page (@{$project_paged})
-    #{
-    #print STDERR join(q{, }, $project_map->{p_id}, $project_page), qq{\n};
-    #}
-    foreach my $project_page (@{$project_paged})
+    my @backers = ();
+    my $backer_result;
+    my $ct = 1;
+    do
     {
-	my $project_content_ext = read_project_content($project_map->{p_id}, $project_page);
-	push(@${project_content}, @{$project_content_ext});
-    }
+	$backer_result = read_project_backers($project_content);
+	push(@backers, @{$backer_result->{backers}});
 
-    my $backers = read_project_backers($project_content);
-    print repr_project_backers($project_map, $backers), qq{\n};
+	++$ct;
+	$project_content = read_project_content($project_map->{p_id},
+						$backer_result->{cursor}, $ct);
+    }
+    until ($backer_result->{final_page});
+
+    print repr_project_backers($project_map, \@backers), qq{\n};
 
     return;
 }
