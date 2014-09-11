@@ -1,4 +1,4 @@
-#!perl
+#!/usr/bin/perl
 
 # HACK HACK HACK :-)
 
@@ -7,7 +7,7 @@ use warnings;
 use Carp;
 
 use File::Basename qw(dirname basename);
-use Data::Dumper;
+use JSON::XS;
 
 my $TIME_BETWEEN_PAGE_REQUESTS = 3; # time, in s, between additional page loads
 
@@ -229,10 +229,7 @@ sub repr_project_meta
     $meta->{title}    = $project_map->{p_title};
     $meta->{vennback} = q{project_meta};
 
-    my $s = '{ ';
-    $s .= join(q{, }, map { qq{"$_": "$meta->{$_}"} } sort keys %{$meta});
-    $s .= ' }';
-    return $s;
+    return encode_json $meta;
 }
 
 sub repr_project_backers
@@ -242,7 +239,9 @@ sub repr_project_backers
     my @s_list = ();
     foreach my $back (@{$backers})
     {
-	my $s = '{ ' . qq{'id': '$project_map->{p_id}', 'vennback': 'project_back', 'backer': '$back'} . ' }';
+	my $s = encode_json { id => $project_map->{p_id},
+			      vennback => q{project_back},
+			      backer => $back };
 	push(@s_list, $s);
 	
     }
