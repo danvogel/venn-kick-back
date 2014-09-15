@@ -8,9 +8,11 @@ use Carp;
 
 use File::Basename qw(dirname basename);
 use JSON::XS;
+use Getopt::Long;
 
 my $TIME_BETWEEN_PAGE_REQUESTS = 3; # time, in s, between additional page loads
 
+my $QUIET_MODE = undef;
 my $SCRIPT_DIR = dirname($0);
 my $PROJECT_CACHE = $SCRIPT_DIR . q{/projects/};
 my $BACKER_PAGE = q{/backers};
@@ -40,8 +42,11 @@ sub download_project
 
     if (-e $cache_name)
     {
-	print STDERR qq{$project_id: already have project },
-	qq{locally as $cache_name\n};
+	if (!defined $QUIET_MODE)
+	{
+	    print STDERR qq{$project_id: already have project },
+	    qq{locally as $cache_name\n};
+	}
 	return;
     }
 
@@ -59,8 +64,12 @@ sub download_project
 	);
 
     my $cmd_str = join(q{}, @cmd);
-    print $cmd_str, qq{\n};
-    print STDERR qq{$project_id: Downloading project...\n};
+    #print $cmd_str, qq{\n};
+
+    if (!defined $QUIET_MODE)
+    {
+	print STDERR qq{$project_id: Downloading project...\n};
+    }
     system($cmd_str);
     sleep($TIME_BETWEEN_PAGE_REQUESTS);
     return;
@@ -296,6 +305,7 @@ sub split_project
 sub main
 {
     # TODO: Argument processing
+    GetOptions(q{quiet} => \$QUIET_MODE);
     
     if (!scalar @ARGV)
     {
