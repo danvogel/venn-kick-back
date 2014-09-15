@@ -7,7 +7,7 @@ use warnings;
 use Carp;
 
 use File::Basename qw(dirname basename);
-
+use JSON::XS;
 
 my $SCRIPT_DIR = dirname($0);
 my $PROFILE_CACHE = $SCRIPT_DIR . '/profile/';
@@ -157,19 +157,18 @@ sub repr_profile_meta
 	$meta_map{$primary} = $meta->{$k};
     }
 
-    my $s = '{' . qq{ user="$id" vennback="meta" };
-    foreach my $k (sort keys %meta_map)
-    {
-	$s .= qq{$k="$meta_map{$k}" };
-    }
-    $s .= '}';
-    return $s;
+    $meta_map{user} = $id;
+    $meta_map{vennback} = q{profile_meta};
+
+    return encode_json \%meta_map;
 }
 
 sub repr_project_backed
 {
     my ($id, $proj, undef) = @_;
-    return join(q{}, '{', qq{ user="$id" vennback="project_backed" project="$proj" }, '}');
+    return encode_json { project => $proj,
+			 vennback => q{profile_back},
+			 backer => $id };
 }
 
 sub read_profile
