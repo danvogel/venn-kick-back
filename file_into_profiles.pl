@@ -101,7 +101,7 @@ sub report_on_backers
 	    push(@all_other_backers, @{$backers->{$j_id}});
 	}
 	my $over = overlap($backers->{$i_id}, \@all_other_backers);
-	print qq{\tShares backers with all candidate projects: $over->{both}\n};
+	print qq{\tShares unique backers with other candidate projects: $over->{both}\n};
     }
     return;
 }
@@ -116,7 +116,7 @@ sub process_project_list
     {
 	$project =~ s/^https\:\/\///ixgm;
 	my $cmd = qq{$PROJECT_SCRIPT $project};
-	print STDERR qq{$cmd\n};
+	#print STDERR qq{$cmd\n};
 
 	open(my $prj_f, q{-|}, $cmd) or croak(qq{Unable to open-exec: '$cmd'});
 	my @proj_json = <$prj_f>;
